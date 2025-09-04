@@ -76,7 +76,7 @@ async def user_profile_view(call: CallbackQuery):
             f"🆔 <b>ID</b> — <code>{user_id}</code>\n"
             f"💳 <b>Balance</b> — <code>{user.balance}</code> €\n"
             f"💵 <b>Total topped up</b> — <code>{overall_balance}</code> €\n"
-            f"🎁 <b>Items purchased</b> — {items} pcs\n\n"
+            f"📦 <b>Items purchased</b> — {items} pcs\n\n"
             f"👤 <b>Referral</b> — <code>{user.referral_id}</code>\n"
             f"👥 <b>User's referrals</b> — {referrals}\n"
             f"🎛 <b>Role</b> — {role}\n"

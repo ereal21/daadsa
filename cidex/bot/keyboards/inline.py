@@ -9,11 +9,11 @@ from bot.utils import display_name
 
 
 
-def main_menu(role: int, reviews: str = None, price: str = None, lang: str = 'en') -> InlineKeyboardMarkup:
+def main_menu(role: int, channel: str = None, price: str = None, lang: str = 'en') -> InlineKeyboardMarkup:
     """Return main menu with layout:
        1) Shop
        2) Profile | Top Up
-       3) Reviews | Price List (only those that exist)
+       3) Channel | Price List (only those that exist)
        4) Language
        (+ Admin panel if role > 1)
     """
@@ -30,10 +30,10 @@ def main_menu(role: int, reviews: str = None, price: str = None, lang: str = 'en
         InlineKeyboardButton(t(lang, 'top_up'), callback_data='replenish_balance'),
     ])
 
-    # Row 3: Reviews | Price List (conditionally add one or both)
+    # Row 3: Channel | Price List (conditionally add one or both)
     row3 = []
-    if reviews:
-        row3.append(InlineKeyboardButton(t(lang, 'reviews'), url=reviews))
+    if channel:
+        row3.append(InlineKeyboardButton(t(lang, 'channel'), url=channel))
     if price:
         row3.append(InlineKeyboardButton(t(lang, 'price_list'), callback_data='price_list'))
     if row3:
@@ -720,11 +720,17 @@ def blackjack_history_menu(index: int, total: int) -> InlineKeyboardMarkup:
 
 
 def feedback_menu(prefix: str) -> InlineKeyboardMarkup:
+    """Return 1-5 star rating buttons using only emojis."""
     buttons = [
-        InlineKeyboardButton(
-            f'{i} Star{"s" if i > 1 else ""} {"⭐" * i}',
-            callback_data=f'{prefix}_{i}'
-        )
-        for i in range(1, 4)
+        InlineKeyboardButton("⭐" * i, callback_data=f"{prefix}_{i}")
+        for i in range(1, 6)
     ]
     return InlineKeyboardMarkup(inline_keyboard=[buttons])
+
+
+def feedback_reason_menu(prefix: str, lang: str) -> InlineKeyboardMarkup:
+    """Return Yes/No menu asking whether to provide feedback text."""
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(t(lang, 'yes'), callback_data=f'{prefix}_yes'),
+        InlineKeyboardButton(t(lang, 'no'), callback_data=f'{prefix}_no'),
+    ]])

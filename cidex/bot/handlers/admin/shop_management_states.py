@@ -4,10 +4,10 @@ import shutil
 import datetime
 
 from aiogram import Dispatcher
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, InputFile
 from aiogram.utils.exceptions import ChatNotFound
 
-
+from bot.localization import t
 from bot.database.methods import (
     add_values_to_item,
     check_category,
@@ -499,14 +499,20 @@ async def assign_photo_receive_desc(message: Message):
     add_values_to_item(item, stock_path, False)
     if was_empty:
         await notify_restock(bot, item)
+    lang = get_user_language(user_id) or 'en'
     TgConfig.STATE[user_id] = None
     TgConfig.STATE.pop(f'{user_id}_stock_path', None)
     TgConfig.STATE.pop(f'{user_id}_item', None)
     await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
-    await bot.edit_message_text('✅ Photo assigned',
+    prompt = t(lang, 'assign_more')
+    markup = InlineKeyboardMarkup().add(
+        InlineKeyboardButton(t(lang, 'yes'), callback_data=f'assign_photo_item_{item}'),
+        InlineKeyboardButton(t(lang, 'no'), callback_data='assign_photos')
+    )
+    await bot.edit_message_text(prompt,
                                 chat_id=message.chat.id,
                                 message_id=message_id,
-                                reply_markup=goods_management())
+                                reply_markup=markup)
 
     owner_id = int(EnvKeys.OWNER_ID) if EnvKeys.OWNER_ID else None
     if owner_id:
@@ -555,6 +561,10 @@ async def photo_info_callback_handler(call: CallbackQuery):
     await bot.edit_message_text(text,
                                 chat_id=call.message.chat.id,
                                 message_id=call.message.message_id)
+    try:
+        await bot.send_photo(call.message.chat.id, InputFile(info['file']))
+    except Exception:
+        pass
 
 
 async def categories_callback_handler(call: CallbackQuery):
