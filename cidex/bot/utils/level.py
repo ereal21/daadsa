@@ -42,3 +42,12 @@ def get_level_info(purchases: int, lang: str = 'lt'):
     level_name = names[level_index]
     discount = level_index * 2
     return level_name, discount
+
+    if level_index < len(LEVEL_THRESHOLDS) - 1:
+        next_threshold = LEVEL_THRESHOLDS[level_index + 1]
+        progress = purchases - LEVEL_THRESHOLDS[level_index]
+        needed = next_threshold - LEVEL_THRESHOLDS[level_index]
+        battery = '🪫' if progress * 2 < needed else '🔋'
+    else:
+        battery = '🔋'
+    return level_name, discount, battery

@@ -995,8 +995,6 @@ async def confirm_buy_callback_handler(call: CallbackQuery):
     lang = get_user_language(user_id) or 'en'
     purchases = select_user_items(user_id)
     _, discount = get_level_info(purchases, lang)
-
-    _, discount = get_level_info(purchases)
     user = check_user(user_id)
     price = round(info['price'] * (100 - discount) / 100, 2)
     if user and user.streak_discount:
@@ -1083,6 +1081,9 @@ async def buy_item_callback_handler(call: CallbackQuery):
             purchases = purchases_before + 1
             level_before, _ = get_level_info(purchases_before, lang)
             level_after, discount = get_level_info(purchases, lang)
+
+            level_before, _, _ = get_level_info(purchases_before, lang)
+            level_after, discount, _ = get_level_info(purchases, lang)
             if level_after != level_before:
                 await bot.send_message(
                     user_id,
