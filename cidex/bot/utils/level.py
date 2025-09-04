@@ -40,15 +40,12 @@ def get_level_info(purchases: int, lang: str = 'lt'):
             break
     names = LEVEL_NAMES.get(lang, LEVEL_NAMES['lt'])
     level_name = names[level_index]
-    discount = round(level_index * 1.2, 1)
+    discount = level_index * 2
     if level_index < len(LEVEL_THRESHOLDS) - 1:
         next_threshold = LEVEL_THRESHOLDS[level_index + 1]
         progress = purchases - LEVEL_THRESHOLDS[level_index]
         needed = next_threshold - LEVEL_THRESHOLDS[level_index]
-        bars_filled = (progress * 5) // needed
-        progress_bar = '🟩' * bars_filled + '⬜️' * (5 - bars_filled)
         battery = '🪫' if progress * 2 < needed else '🔋'
     else:
-        progress_bar = '🟩' * 5
         battery = '🔋'
-    return level_name, discount, progress_bar, battery
+    return level_name, discount, battery
