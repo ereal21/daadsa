@@ -1501,38 +1501,23 @@ async def achievements_callback_handler(call: CallbackQuery):
     per_page = 5
     start = page * per_page
     show_unlocked = view == 'achievements_unlocked'
-    all_codes = [code for code in TgConfig.ACHIEVEMENTS if has_user_achievement(user_id, code) == show_unlocked]
+    codes = [
+        code for code in TgConfig.ACHIEVEMENTS
+        if has_user_achievement(user_id, code) == show_unlocked
+    ]
     lines = []
-    for idx, code in enumerate(all_codes[start:start + per_page], start=start + 1):
+    for idx, code in enumerate(codes[start:start + per_page], start=start + 1):
         count = get_achievement_users(code)
         percent = round((count / total_users) * 100, 1) if total_users else 0
         status = '✅' if show_unlocked else '❌'
         lines.append(f"{idx}. {status} {t(lang, f'achievement_{code}')} — {percent}%")
     text = f"{t(lang, 'achievements')}\n\n" + "\n".join(lines)
-    markup = achievements_menu(page, len(all_codes), lang, show_unlocked)
-    page = int(parts[1]) if len(parts) > 1 else 0
-    per_page = 5
-    start = page * per_page
-    achievements = TgConfig.ACHIEVEMENTS
-    lines = []
-    for idx, code in enumerate(achievements[start:start + per_page], start=start + 1):
-    lines = []
-    for code in TgConfig.ACHIEVEMENTS:
-        count = get_achievement_users(code)
-        percent = round((count / total_users) * 100, 1) if total_users else 0
-        have = has_user_achievement(user_id, code)
-        status = '✅' if have else '❌'
-        lines.append(f"{idx}. {status} {t(lang, f'achievement_{code}')} — {percent}%")
-    text = f"{t(lang, 'achievements')}\n\n" + "\n".join(lines)
-    markup = achievements_menu(page, len(achievements), lang)
-        lines.append(f"{status} {t(lang, f'achievement_{code}')} — {percent}%")
-    text = f"{t(lang, 'achievements')}\n\n" + "\n".join(lines)
+    markup = achievements_menu(page, len(codes), lang, show_unlocked)
     await bot.edit_message_text(
         chat_id=call.message.chat.id,
         message_id=call.message.message_id,
         text=text,
-        reply_markup=markup
-        reply_markup=back('profile')
+        reply_markup=markup,
     )
 
 
@@ -2068,10 +2053,6 @@ def register_user_handlers(dp: Dispatcher):
                                        lambda c: c.data == 'quests')
     dp.register_callback_query_handler(achievements_callback_handler,
                                        lambda c: c.data.startswith('achievements'))
-
-
-    dp.register_callback_query_handler(achievements_callback_handler,
-                                       lambda c: c.data == 'achievements')
     dp.register_callback_query_handler(notify_stock_callback_handler,
                                        lambda c: c.data == 'notify_stock')
     dp.register_callback_query_handler(notify_category_callback_handler,

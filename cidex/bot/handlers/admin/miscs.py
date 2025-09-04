@@ -7,6 +7,7 @@ from bot.database.methods import (
     get_users_with_tickets,
     reset_lottery_tickets,
     get_all_users,
+    get_user_language,
 )
 from bot.database.models import Permission
 from bot.handlers.other import get_bot_user_ids
@@ -18,6 +19,7 @@ from bot.keyboards import (
     back,
 )
 from bot.misc import TgConfig
+from bot.localization import t
 
 
 def _pick_winner():
@@ -38,38 +40,41 @@ async def miscs_callback_handler(call: CallbackQuery):
     bot, user_id = await get_bot_user_ids(call)
     TgConfig.STATE[user_id] = None
     role = check_role(user_id)
+    lang = get_user_language(user_id) or 'en'
     if role != Permission.USE:
         await bot.edit_message_text(
-            '🧰 Įrankiai',
+            t(lang, 'tools'),
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             reply_markup=miscs_menu(),
         )
         return
-    await call.answer('Nepakanka teisių')
+    await call.answer(t(lang, 'insufficient_rights'))
 
 
 async def lottery_callback_handler(call: CallbackQuery):
     bot, user_id = await get_bot_user_ids(call)
     TgConfig.STATE[user_id] = None
     role = check_role(user_id)
+    lang = get_user_language(user_id) or 'en'
     if role != Permission.USE:
         await bot.edit_message_text(
-            '🎟️ Loterija',
+            t(lang, 'lottery'),
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             reply_markup=lottery_menu(),
         )
         return
-    await call.answer('Nepakanka teisių')
+    await call.answer(t(lang, 'insufficient_rights'))
 
 
 async def view_tickets_handler(call: CallbackQuery):
     bot, user_id = await get_bot_user_ids(call)
+    lang = get_user_language(user_id) or 'en'
     users = get_users_with_tickets()
-    lines = ['🎟️ Vartotojų bilietai:']
+    lines = [t(lang, 'users_tickets')]
     if not users:
-        lines.append('Nėra bilietų')
+        lines.append(t(lang, 'no_tickets'))
     else:
         for uid, username, count in users:
             name = f'@{username}' if username else str(uid)
@@ -84,10 +89,11 @@ async def view_tickets_handler(call: CallbackQuery):
 
 async def run_lottery_handler(call: CallbackQuery):
     bot, user_id = await get_bot_user_ids(call)
+    lang = get_user_language(user_id) or 'en'
     winner = _pick_winner()
     if not winner:
         await bot.edit_message_text(
-            '🎟️ Nėra bilietų',
+            t(lang, 'no_tickets'),
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             reply_markup=back('lottery'),
@@ -95,31 +101,28 @@ async def run_lottery_handler(call: CallbackQuery):
         return
     TgConfig.STATE['lottery_winner'] = winner
     username = f'@{winner[1]}' if winner[1] else str(winner[0])
-    text = (
-        f'🎉 Nugalėtojas: {username}\n'
-        f'🎟️ Bilietai: {winner[2]}\n\n'
-        '❗️ Patvirtinus, visi bilietai bus ištrinti.'
-    )
+    text = t(lang, 'lottery_winner', username=username, tickets=winner[2])
     await bot.edit_message_text(
         text,
         chat_id=call.message.chat.id,
         message_id=call.message.message_id,
-        reply_markup=lottery_run_menu(),
+        reply_markup=lottery_run_menu(lang),
     )
 
 
 async def lottery_confirm_handler(call: CallbackQuery):
     bot, user_id = await get_bot_user_ids(call)
     if not TgConfig.STATE.get('lottery_winner'):
-        await call.answer('❌ Nėra nugalėtojo')
+        lang = get_user_language(user_id) or 'en'
+        await call.answer(t(lang, 'no_winner'))
         return
     role = check_role(user_id)
-
+    lang = get_user_language(user_id) or 'en'
     await bot.edit_message_text(
-        '📢 Siųsti pranešimą visiems vartotojams?',
+        t(lang, 'lottery_broadcast_prompt'),
         chat_id=call.message.chat.id,
         message_id=call.message.message_id,
-        reply_markup=lottery_broadcast_menu(role),
+        reply_markup=lottery_broadcast_menu(role, lang),
     )
 
 
@@ -140,10 +143,11 @@ async def lottery_cancel_handler(call: CallbackQuery):
 
 async def lottery_broadcast_yes(call: CallbackQuery):
     bot, user_id = await get_bot_user_ids(call)
+    lang = get_user_language(user_id) or 'en'
     TgConfig.STATE[user_id] = 'lottery_broadcast_message'
     TgConfig.STATE[f'{user_id}_message_id'] = call.message.message_id
     await bot.edit_message_text(
-        '✉️ Įveskite pranešimą:',
+        t(lang, 'lottery_enter_message'),
         chat_id=call.message.chat.id,
         message_id=call.message.message_id,
     )
@@ -151,10 +155,11 @@ async def lottery_broadcast_yes(call: CallbackQuery):
 
 async def lottery_broadcast_no(call: CallbackQuery):
     bot, user_id = await get_bot_user_ids(call)
+    lang = get_user_language(user_id) or 'en'
     reset_lottery_tickets()
     TgConfig.STATE.pop('lottery_winner', None)
     await bot.edit_message_text(
-        '✅ Loterija baigta.',
+        t(lang, 'lottery_finished'),
         chat_id=call.message.chat.id,
         message_id=call.message.message_id,
         reply_markup=back('lottery'),
