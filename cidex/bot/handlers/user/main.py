@@ -26,13 +26,14 @@ from bot.database.methods import (
     get_unfinished_operation, get_promocode, add_values_to_item, get_user_tickets, update_lottery_tickets,
     has_user_achievement, get_achievement_users, grant_achievement, get_user_count,
     get_out_of_stock_categories, get_out_of_stock_subcategories, get_out_of_stock_items,
-    has_stock_notification, add_stock_notification, check_user_by_username, check_user_referrals
+    has_stock_notification, add_stock_notification, check_user_by_username, check_user_referrals,
+    sum_referral_operations,
 )
 from bot.handlers.other import get_bot_user_ids, get_bot_info
 from bot.keyboards import (
     main_menu, categories_list, goods_list, subcategories_list, user_items_list, back, item_info,
     profile, rules, payment_menu, close, crypto_choice, crypto_invoice_menu, blackjack_controls,
-    blackjack_bet_input_menu, blackjack_end_menu, blackjack_history_menu, feedback_menu,
+    blackjack_bet_input_menu, blackjack_end_menu, blackjack_history_menu, feedback_menu, feedback_reason_menu,
     confirm_purchase_menu, games_menu, coinflip_menu, coinflip_side_menu,
     achievements_menu, coinflip_create_confirm_menu, coinflip_waiting_menu, coinflip_rooms_menu, coinflip_join_confirm_menu,
     crypto_choice_purchase, notify_categories_list, notify_subcategories_list, notify_goods_list)
@@ -52,8 +53,8 @@ from bot.utils.files import cleanup_item_file
 def build_menu_text(user_obj, balance: float, purchases: int, streak: int, lang: str) -> str:
     """Return main menu text with loyalty status and streak."""
     mention = f"<a href='tg://user?id={user_obj.id}'>{html.escape(user_obj.full_name)}</a>"
-    level_name, _, progress_bar, battery = get_level_info(purchases, lang)
-    status = f"👤 Status: {level_name} [{progress_bar}] {battery}"
+    level_name, _ = get_level_info(purchases, lang)
+    status = f"👤 Status: {level_name}"
     streak_line = t(lang, 'streak', days=streak)
     return (
         f"{t(lang, 'hello', user=mention)}\n"
@@ -66,9 +67,9 @@ def build_menu_text(user_obj, balance: float, purchases: int, streak: int, lang:
 
 
 async def schedule_feedback(bot, user_id: int, lang: str) -> None:
-    """Send feedback prompt five minutes after purchase."""
-    await asyncio.sleep(5 * 60)
-    await bot.send_message(user_id, t(lang, 'feedback_service'), reply_markup=feedback_menu('feedback_service'))
+    """Send rating prompt one hour after purchase."""
+    await asyncio.sleep(60 * 60)
+    await bot.send_message(user_id, t(lang, 'rate_experience'), reply_markup=feedback_menu('feedback_rate'))
 
 
 def build_subcategory_description(parent: str, lang: str) -> str:
@@ -162,7 +163,7 @@ async def start(message: Message):
 
     balance = user_db.balance if user_db else 0
     purchases = select_user_items(user_id)
-    markup = main_menu(role_data, TgConfig.REVIEWS_URL, TgConfig.PRICE_LIST_URL, user_lang)
+    markup = main_menu(role_data, TgConfig.CHANNEL_URL, TgConfig.PRICE_LIST_URL, user_lang)
     text = build_menu_text(message.from_user, balance, purchases, user_db.purchase_streak, user_lang)
     try:
         with open(TgConfig.START_PHOTO_PATH, 'rb') as photo:
@@ -229,7 +230,7 @@ async def back_to_menu_callback_handler(call: CallbackQuery):
     bot, user_id = await get_bot_user_ids(call)
     user = check_user(call.from_user.id)
     user_lang = get_user_language(user_id) or 'en'
-    markup = main_menu(user.role_id, TgConfig.REVIEWS_URL, TgConfig.PRICE_LIST_URL, user_lang)
+    markup = main_menu(user.role_id, TgConfig.CHANNEL_URL, TgConfig.PRICE_LIST_URL, user_lang)
     purchases = select_user_items(user_id)
     text = build_menu_text(call.from_user, user.balance, purchases, user.purchase_streak, user_lang)
     await bot.edit_message_text(text,
@@ -373,29 +374,67 @@ async def blackjack_history_handler(call: CallbackQuery):
                                reply_markup=blackjack_history_menu(index, total))
 
 
-async def feedback_service_handler(call: CallbackQuery):
+async def feedback_rate_handler(call: CallbackQuery):
     bot, user_id = await get_bot_user_ids(call)
     rating = int(call.data.split('_')[2])
-    TgConfig.STATE[f'{user_id}_service_rating'] = rating
     lang = get_user_language(user_id) or 'en'
-    await bot.edit_message_text(t(lang, 'feedback_product'),
-                               chat_id=call.message.chat.id,
-                               message_id=call.message.message_id,
-                               reply_markup=feedback_menu('feedback_product'))
+    if rating <= 3:
+        TgConfig.STATE[f'{user_id}_pending_rating'] = rating
+        await bot.edit_message_text(
+            t(lang, 'ask_feedback_reason'),
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            reply_markup=feedback_reason_menu('feedback_reason', lang)
+        )
+    else:
+        await bot.edit_message_text(
+            t(lang, 'thanks_feedback'),
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id
+        )
+        username = f'@{call.from_user.username}' if call.from_user.username else call.from_user.full_name
+        await bot.send_message(
+            EnvKeys.OWNER_ID,
+            f'User {username} rated {rating}\u2b50'
+        )
 
 
-async def feedback_product_handler(call: CallbackQuery):
+async def feedback_reason_handler(call: CallbackQuery):
     bot, user_id = await get_bot_user_ids(call)
-    rating = int(call.data.split('_')[2])
-    service_rating = TgConfig.STATE.pop(f'{user_id}_service_rating', None)
+    choice = call.data.split('_')[2]
     lang = get_user_language(user_id) or 'en'
-    await bot.edit_message_text(t(lang, 'thanks_feedback'),
-                               chat_id=call.message.chat.id,
-                               message_id=call.message.message_id)
-    username = f'@{call.from_user.username}' if call.from_user.username else call.from_user.full_name
+    rating = TgConfig.STATE.pop(f'{user_id}_pending_rating', None)
+    if choice == 'yes' and rating is not None:
+        TgConfig.STATE[f'{user_id}_awaiting_comment'] = rating
+        await bot.edit_message_text(
+            t(lang, 'feedback_reason'),
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id
+        )
+    else:
+        await bot.edit_message_text(
+            t(lang, 'thanks_feedback'),
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id
+        )
+        username = f'@{call.from_user.username}' if call.from_user.username else call.from_user.full_name
+        await bot.send_message(
+            EnvKeys.OWNER_ID,
+            f'User {username} rated {rating}\u2b50'
+        )
+
+
+async def feedback_text_handler(message: Message):
+    bot, user_id = await get_bot_user_ids(message)
+    rating = TgConfig.STATE.pop(f'{user_id}_awaiting_comment', None)
+    if rating is None:
+        return
+    lang = get_user_language(user_id) or 'en'
+    await bot.send_message(user_id, t(lang, 'thanks_feedback'))
+    username = f'@{message.from_user.username}' if message.from_user.username else message.from_user.full_name
     await bot.send_message(
         EnvKeys.OWNER_ID,
-        f'User {username} feedback: service {service_rating}, product {rating}'
+        f'User {username} rated {rating}\u2b50 and said: {message.text}'
     )
 
 
@@ -889,7 +928,7 @@ async def item_info_callback_handler(call: CallbackQuery):
     category = item_info_list['category_name']
     lang = get_user_language(user_id) or 'en'
     purchases = select_user_items(user_id)
-    _, discount, _, _ = get_level_info(purchases, lang)
+    _, discount = get_level_info(purchases, lang)
     price = round(item_info_list["price"] * (100 - discount) / 100, 2)
     markup = item_info(item_name, category, lang)
     await bot.edit_message_text(
@@ -955,9 +994,9 @@ async def confirm_buy_callback_handler(call: CallbackQuery):
         return
     lang = get_user_language(user_id) or 'en'
     purchases = select_user_items(user_id)
-    _, discount, _, _ = get_level_info(purchases, lang)
+    _, discount = get_level_info(purchases, lang)
 
-    _, discount, _, _ = get_level_info(purchases)
+    _, discount = get_level_info(purchases)
     user = check_user(user_id)
     price = round(info['price'] * (100 - discount) / 100, 2)
     if user and user.streak_discount:
@@ -1042,8 +1081,8 @@ async def buy_item_callback_handler(call: CallbackQuery):
             else:
                 add_bought_item(value_data['item_name'], value_data['value'], item_price, user_id, formatted_time)
             purchases = purchases_before + 1
-            level_before, _, _, _ = get_level_info(purchases_before, lang)
-            level_after, discount, _, _ = get_level_info(purchases, lang)
+            level_before, _ = get_level_info(purchases_before, lang)
+            level_after, discount = get_level_info(purchases, lang)
             if level_after != level_before:
                 await bot.send_message(
                     user_id,
@@ -1135,6 +1174,12 @@ async def buy_item_callback_handler(call: CallbackQuery):
             update_lottery_tickets(user_id, 1)
             await bot.send_message(user_id, t(lang, 'lottery_ticket_awarded'))
             process_purchase_streak(user_id)
+            reserve_msg_id = TgConfig.STATE.pop(f'{user_id}_reserve_msg', None)
+            if reserve_msg_id:
+                try:
+                    await bot.delete_message(user_id, reserve_msg_id)
+                except Exception:
+                    pass
             if gift_to:
                 await bot.send_message(user_id, t(lang, 'gift_sent', user=f'@{gift_name}'), reply_markup=back('profile'))
                 if not has_user_achievement(user_id, 'gift_sent'):
@@ -1173,7 +1218,9 @@ async def buy_item_callback_handler(call: CallbackQuery):
                         f" bought 1 item of {value_data['item_name']} for {item_price}€")
             TgConfig.STATE.pop(f'{user_id}_pending_item', None)
             TgConfig.STATE.pop(f'{user_id}_price', None)
-            asyncio.create_task(schedule_feedback(bot, user_id, lang))
+            recipient = gift_to or user_id
+            recipient_lang = get_user_language(recipient) or lang
+            asyncio.create_task(schedule_feedback(bot, recipient, recipient_lang))
             return
 
             if not gift_to:
@@ -1211,7 +1258,8 @@ async def buy_item_callback_handler(call: CallbackQuery):
         message_id=msg,
         reply_markup=crypto_choice_purchase(item_name, lang),
     )
-    await bot.send_message(user_id, t(lang, 'item_reserved'))
+    reserve_msg = await bot.send_message(user_id, t(lang, 'item_reserved'))
+    TgConfig.STATE[f'{user_id}_reserve_msg'] = reserve_msg.message_id
     if gift_to:
         TgConfig.STATE[f'{user_id}_gift_to'] = gift_to
         TgConfig.STATE[f'{user_id}_gift_name'] = gift_name
@@ -1354,7 +1402,7 @@ async def process_home_menu(call: CallbackQuery):
     bot, user_id = await get_bot_user_ids(call)
     user = check_user(user_id)
     lang = get_user_language(user_id) or 'en'
-    markup = main_menu(user.role_id, TgConfig.REVIEWS_URL, TgConfig.PRICE_LIST_URL, lang)
+    markup = main_menu(user.role_id, TgConfig.CHANNEL_URL, TgConfig.PRICE_LIST_URL, lang)
     purchases = select_user_items(user_id)
     text = build_menu_text(call.from_user, user.balance, purchases, user.purchase_streak, lang)
     await bot.send_message(user_id, text, reply_markup=markup)
@@ -1457,6 +1505,8 @@ async def profile_callback_handler(call: CallbackQuery):
 
     items = select_user_items(user_id)
     ref_count = check_user_referrals(user_id)
+    ref_total = sum_referral_operations(user_id)
+    ref_earnings = round(ref_total * TgConfig.REFERRAL_PERCENT / 100, 2)
     bot_username = await get_bot_info(call)
     encoded_id = base64.urlsafe_b64encode(str(user_id).encode()).decode().rstrip('=')
     ref_link = f"https://t.me/{bot_username}?start=ref_{encoded_id}"
@@ -1469,7 +1519,8 @@ async def profile_callback_handler(call: CallbackQuery):
             f"{t(user_lang, 'lottery_tickets', tickets=tickets)}\n"
             f"{t(user_lang, 'referral_link', link=ref_link)}\n"
             f"{t(user_lang, 'referrals', count=ref_count)}\n"
-            f" 🎁 <b>Items purchased</b> — {items} pcs"
+            f"{t(user_lang, 'referral_earnings', amount=f'{ref_earnings:.2f}')}\n"
+            f" 📦 <b>Items purchased</b> — {items} pcs"
         ),
         chat_id=call.message.chat.id,
         message_id=call.message.message_id,
@@ -1501,38 +1552,23 @@ async def achievements_callback_handler(call: CallbackQuery):
     per_page = 5
     start = page * per_page
     show_unlocked = view == 'achievements_unlocked'
-    all_codes = [code for code in TgConfig.ACHIEVEMENTS if has_user_achievement(user_id, code) == show_unlocked]
+    codes = [
+        code for code in TgConfig.ACHIEVEMENTS
+        if has_user_achievement(user_id, code) == show_unlocked
+    ]
     lines = []
-    for idx, code in enumerate(all_codes[start:start + per_page], start=start + 1):
+    for idx, code in enumerate(codes[start:start + per_page], start=start + 1):
         count = get_achievement_users(code)
         percent = round((count / total_users) * 100, 1) if total_users else 0
         status = '✅' if show_unlocked else '❌'
         lines.append(f"{idx}. {status} {t(lang, f'achievement_{code}')} — {percent}%")
     text = f"{t(lang, 'achievements')}\n\n" + "\n".join(lines)
-    markup = achievements_menu(page, len(all_codes), lang, show_unlocked)
-    page = int(parts[1]) if len(parts) > 1 else 0
-    per_page = 5
-    start = page * per_page
-    achievements = TgConfig.ACHIEVEMENTS
-    lines = []
-    for idx, code in enumerate(achievements[start:start + per_page], start=start + 1):
-    lines = []
-    for code in TgConfig.ACHIEVEMENTS:
-        count = get_achievement_users(code)
-        percent = round((count / total_users) * 100, 1) if total_users else 0
-        have = has_user_achievement(user_id, code)
-        status = '✅' if have else '❌'
-        lines.append(f"{idx}. {status} {t(lang, f'achievement_{code}')} — {percent}%")
-    text = f"{t(lang, 'achievements')}\n\n" + "\n".join(lines)
-    markup = achievements_menu(page, len(achievements), lang)
-        lines.append(f"{status} {t(lang, f'achievement_{code}')} — {percent}%")
-    text = f"{t(lang, 'achievements')}\n\n" + "\n".join(lines)
+    markup = achievements_menu(page, len(codes), lang, show_unlocked)
     await bot.edit_message_text(
         chat_id=call.message.chat.id,
         message_id=call.message.message_id,
         text=text,
-        reply_markup=markup
-        reply_markup=back('profile')
+        reply_markup=markup,
     )
 
 
@@ -1807,27 +1843,42 @@ async def checking_payment(call: CallbackQuery):
                             if photo_desc:
                                 caption += f'\n\n{photo_desc}'
                             if gift_to:
-
-        if gift_to:
                                 recipient_lang = get_user_language(gift_to) or 'en'
-                                recipient_caption = t(recipient_lang, 'gift_received', item=value_data['item_name'], user=username)
+                                recipient_caption = t(
+                                    recipient_lang,
+                                    'gift_received',
+                                    item=value_data['item_name'],
+                                    user=username
+                                )
                                 if value_data['value'].endswith('.mp4'):
-                                    await bot.send_video(gift_to, media, caption=recipient_caption, parse_mode='HTML')
+                                    await bot.send_video(
+                                        gift_to,
+                                        media,
+                                        caption=recipient_caption,
+                                        parse_mode='HTML'
+                                    )
                                 else:
-                                    await bot.send_photo(gift_to, media, caption=recipient_caption, parse_mode='HTML')
+                                    await bot.send_photo(
+                                        gift_to,
+                                        media,
+                                        caption=recipient_caption,
+                                        parse_mode='HTML'
+                                    )
                             else:
                                 if value_data['value'].endswith('.mp4'):
-                                    await bot.send_video(chat_id=call.message.chat.id, video=media, caption=caption, parse_mode='HTML')
+                                    await bot.send_video(
+                                        chat_id=call.message.chat.id,
+                                        video=media,
+                                        caption=caption,
+                                        parse_mode='HTML'
+                                    )
                                 else:
-                                    await bot.send_photo(chat_id=call.message.chat.id, photo=media, caption=caption, parse_mode='HTML')
-
-
-
-
-                            if value_data['value'].endswith('.mp4'):
-                                await bot.send_video(chat_id=call.message.chat.id, video=media, caption=caption, parse_mode='HTML')
-                            else:
-                                await bot.send_photo(chat_id=call.message.chat.id, photo=media, caption=caption, parse_mode='HTML')
+                                    await bot.send_photo(
+                                        chat_id=call.message.chat.id,
+                                        photo=media,
+                                        caption=caption,
+                                        parse_mode='HTML'
+                                    )
 
 
                         sold_folder = os.path.join(os.path.dirname(value_data['value']), 'Sold')
@@ -1840,16 +1891,22 @@ async def checking_payment(call: CallbackQuery):
                         if os.path.isfile(desc_file):
                             cleanup_item_file(desc_file)
                     else:
-
                         if gift_to:
                             recipient_lang = get_user_language(gift_to) or 'en'
-                            await bot.send_message(gift_to, t(recipient_lang, 'gift_received', item=value_data['item_name'], user=username))
+                            await bot.send_message(
+                                gift_to,
+                                t(
+                                    recipient_lang,
+                                    'gift_received',
+                                    item=value_data['item_name'],
+                                    user=username
+                                )
+                            )
                         else:
-                            await bot.send_message(call.message.chat.id, value_data['value'])
-
-
-
-                        await bot.send_message(call.message.chat.id, value_data['value'])
+                            await bot.send_message(
+                                call.message.chat.id,
+                                value_data['value']
+                            )
 
 
 
@@ -1915,7 +1972,9 @@ async def checking_payment(call: CallbackQuery):
 
                     await bot.send_message(user_id, t(lang, 'top_up_completed'))
 
-                    asyncio.create_task(schedule_feedback(bot, user_id, lang))
+                    recipient = gift_to or user_id
+                    recipient_lang = get_user_language(recipient) or lang
+                    asyncio.create_task(schedule_feedback(bot, recipient, recipient_lang))
                 else:
                     await bot.send_message(user_id, '❌ Item out of stock')
             else:
@@ -1982,6 +2041,12 @@ async def cancel_payment(call: CallbackQuery):
             await bot.delete_message(user_id_db, message_id)
         except Exception:
             pass
+        reserve_msg_id = TgConfig.STATE.pop(f'{user_id_db}_reserve_msg', None)
+        if reserve_msg_id:
+            try:
+                await bot.delete_message(user_id_db, reserve_msg_id)
+            except Exception:
+                pass
         await bot.send_message(user_id_db, t(lang, 'payment_cancelled'), reply_markup=home_markup(lang))
     else:
         await call.answer(text='❌ Invoice not found')
@@ -1994,6 +2059,26 @@ async def check_sub_to_channel(call: CallbackQuery):
     lang = get_user_language(user_id) or 'en'
     if get_unfinished_operation(invoice_id):
         finish_operation(invoice_id)
+        purchase_data = TgConfig.STATE.pop(f'purchase_{invoice_id}', None)
+        if purchase_data and purchase_data.get('reserved'):
+            reserved = purchase_data['reserved']
+            if reserved and not reserved['is_infinity']:
+                was_empty = (
+                    select_item_values_amount(purchase_data['item']) == 0
+                    and not check_value(purchase_data['item'])
+                )
+                add_values_to_item(purchase_data['item'], reserved['value'], reserved['is_infinity'])
+                if was_empty:
+                    await notify_restock(bot, purchase_data['item'])
+        TgConfig.STATE.pop(f'{user_id}_pending_item', None)
+        TgConfig.STATE.pop(f'{user_id}_price', None)
+        TgConfig.STATE.pop(f'{user_id}_deduct', None)
+        reserve_msg_id = TgConfig.STATE.pop(f'{user_id}_reserve_msg', None)
+        if reserve_msg_id:
+            try:
+                await bot.delete_message(user_id, reserve_msg_id)
+            except Exception:
+                pass
         await bot.edit_message_text(
             t(lang, 'invoice_cancelled'),
             chat_id=call.message.chat.id,
@@ -2031,7 +2116,7 @@ async def set_language(call: CallbackQuery):
     role = check_role(user_id)
     user = check_user(user_id)
     balance = user.balance if user else 0
-    markup = main_menu(role, TgConfig.REVIEWS_URL, TgConfig.PRICE_LIST_URL, lang_code)
+    markup = main_menu(role, TgConfig.CHANNEL_URL, TgConfig.PRICE_LIST_URL, lang_code)
     purchases = select_user_items(user_id)
     text = build_menu_text(call.from_user, balance, purchases, user.purchase_streak, lang_code)
 
@@ -2068,10 +2153,6 @@ def register_user_handlers(dp: Dispatcher):
                                        lambda c: c.data == 'quests')
     dp.register_callback_query_handler(achievements_callback_handler,
                                        lambda c: c.data.startswith('achievements'))
-
-
-    dp.register_callback_query_handler(achievements_callback_handler,
-                                       lambda c: c.data == 'achievements')
     dp.register_callback_query_handler(notify_stock_callback_handler,
                                        lambda c: c.data == 'notify_stock')
     dp.register_callback_query_handler(notify_category_callback_handler,
@@ -2118,10 +2199,12 @@ def register_user_handlers(dp: Dispatcher):
                                        lambda c: c.data.startswith('coinflip_room_'))
     dp.register_callback_query_handler(coinflip_join_handler,
                                        lambda c: c.data.startswith('coinflip_join_'))
-    dp.register_callback_query_handler(feedback_service_handler,
-                                       lambda c: c.data.startswith('feedback_service_'), state='*')
-    dp.register_callback_query_handler(feedback_product_handler,
-                                       lambda c: c.data.startswith('feedback_product_'), state='*')
+    dp.register_callback_query_handler(feedback_rate_handler,
+                                       lambda c: c.data.startswith('feedback_rate_'), state='*')
+    dp.register_callback_query_handler(feedback_reason_handler,
+                                       lambda c: c.data.startswith('feedback_reason_'), state='*')
+    dp.register_message_handler(feedback_text_handler,
+                                lambda m: TgConfig.STATE.get(f'{m.from_user.id}_awaiting_comment'), state='*')
     dp.register_callback_query_handler(bought_items_callback_handler,
                                        lambda c: c.data == 'bought_items', state='*')
     dp.register_callback_query_handler(back_to_menu_callback_handler,

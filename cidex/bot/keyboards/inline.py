@@ -9,11 +9,11 @@ from bot.utils import display_name
 
 
 
-def main_menu(role: int, reviews: str = None, price: str = None, lang: str = 'en') -> InlineKeyboardMarkup:
+def main_menu(role: int, channel: str = None, price: str = None, lang: str = 'en') -> InlineKeyboardMarkup:
     """Return main menu with layout:
        1) Shop
        2) Profile | Top Up
-       3) Reviews | Price List (only those that exist)
+       3) Channel | Price List (only those that exist)
        4) Language
        (+ Admin panel if role > 1)
     """
@@ -30,10 +30,10 @@ def main_menu(role: int, reviews: str = None, price: str = None, lang: str = 'en
         InlineKeyboardButton(t(lang, 'top_up'), callback_data='replenish_balance'),
     ])
 
-    # Row 3: Reviews | Price List (conditionally add one or both)
+    # Row 3: Channel | Price List (conditionally add one or both)
     row3 = []
-    if reviews:
-        row3.append(InlineKeyboardButton(t(lang, 'reviews'), url=reviews))
+    if channel:
+        row3.append(InlineKeyboardButton(t(lang, 'channel'), url=channel))
     if price:
         row3.append(InlineKeyboardButton(t(lang, 'price_list'), callback_data='price_list'))
     if row3:
@@ -142,20 +142,14 @@ def profile(user_items: int = 0, lang: str = 'en') -> InlineKeyboardMarkup:
         [InlineKeyboardButton(t(lang, 'achievements'), callback_data='achievements')],
         [InlineKeyboardButton(t(lang, 'quests'), callback_data='quests')],
         [InlineKeyboardButton(t(lang, 'gift'), callback_data='gift')],
-        [InlineKeyboardButton(t(lang, 'stock_notify'), callback_data='notify_stock')]
+        [InlineKeyboardButton(t(lang, 'stock_notify'), callback_data='notify_stock')],
     ]
-
-
-    inline_keyboard.append([InlineKeyboardButton(t(lang, 'gift'), callback_data='gift')])
-    inline_keyboard.append([InlineKeyboardButton(t(lang, 'games'), callback_data='games')])
-    inline_keyboard.append([InlineKeyboardButton(t(lang, 'achievements'), callback_data='achievements')])
-    inline_keyboard.append([InlineKeyboardButton(t(lang, 'stock_notify'), callback_data='notify_stock')])
-
-    inline_keyboard.append([InlineKeyboardButton(t(lang, 'games'), callback_data='games')])
     if user_items != 0:
-        inline_keyboard.append([InlineKeyboardButton('🎁 Purchased items', callback_data='bought_items')])
+        inline_keyboard.append([
+            InlineKeyboardButton(t(lang, 'purchased_items'), callback_data='bought_items')
+        ])
     inline_keyboard.append([InlineKeyboardButton(t(lang, 'help'), callback_data='help')])
-    inline_keyboard.append([InlineKeyboardButton('🔙 Back to menu', callback_data='back_to_menu')])
+    inline_keyboard.append([InlineKeyboardButton(t(lang, 'back_to_menu'), callback_data='back_to_menu')])
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
 
@@ -177,17 +171,8 @@ def achievements_menu(page: int, total: int, lang: str = 'en', unlocked: bool = 
         nav.append(InlineKeyboardButton('➡️', callback_data=f'{prefix}:{page+1}'))
     rows = [nav] if nav else []
     toggle_label = t(lang, 'show_locked') if unlocked else t(lang, 'show_unlocked')
-    toggle_cb = ('achievements:0' if unlocked else 'achievements_unlocked:0')
+    toggle_cb = 'achievements:0' if unlocked else 'achievements_unlocked:0'
     rows.append([InlineKeyboardButton(toggle_label, callback_data=toggle_cb)])
-
-
-def achievements_menu(page: int, total: int, lang: str = 'en') -> InlineKeyboardMarkup:
-    nav = []
-    if page > 0:
-        nav.append(InlineKeyboardButton('⬅️', callback_data=f'achievements:{page-1}'))
-    if (page + 1) * 5 < total:
-        nav.append(InlineKeyboardButton('➡️', callback_data=f'achievements:{page+1}'))
-    rows = [nav] if nav else []
     rows.append([InlineKeyboardButton(t(lang, 'back'), callback_data='profile')])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -401,41 +386,20 @@ def lottery_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
 
-def lottery_run_menu() -> InlineKeyboardMarkup:
+def lottery_run_menu(lang: str = 'en') -> InlineKeyboardMarkup:
     inline_keyboard = [
-        [InlineKeyboardButton('✅ Patvirtinti', callback_data='lottery_confirm')],
-        [InlineKeyboardButton('🔄 Perleisti', callback_data='lottery_rerun')],
-        [InlineKeyboardButton('❌ Atšaukti', callback_data='lottery_cancel')],
+        [InlineKeyboardButton(t(lang, 'confirm'), callback_data='lottery_confirm')],
+        [InlineKeyboardButton(t(lang, 'rerun'), callback_data='lottery_rerun')],
+        [InlineKeyboardButton(t(lang, 'cancel'), callback_data='lottery_cancel')],
     ]
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
 
-def lottery_broadcast_menu(role: int) -> InlineKeyboardMarkup:
+def lottery_broadcast_menu(role: int, lang: str = 'en') -> InlineKeyboardMarkup:
     inline_keyboard = []
     if role & Permission.OWN:
-        inline_keyboard.append([InlineKeyboardButton('✅ Taip', callback_data='lottery_broadcast_yes')])
-    inline_keyboard.append([InlineKeyboardButton('❌ Ne', callback_data='lottery_broadcast_no')])
-    return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
-
-
-def lottery_run_menu() -> InlineKeyboardMarkup:
-    inline_keyboard = [
-        [InlineKeyboardButton('✅ Patvirtinti', callback_data='lottery_confirm')],
-        [InlineKeyboardButton('🔄 Perleisti', callback_data='lottery_rerun')],
-        [InlineKeyboardButton('❌ Atšaukti', callback_data='lottery_cancel')],
-    ]
-    return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
-
-
-def lottery_broadcast_menu() -> InlineKeyboardMarkup:
-    inline_keyboard = [
-        [InlineKeyboardButton('✅ Taip', callback_data='lottery_broadcast_yes')],
-        [InlineKeyboardButton('❌ Ne', callback_data='lottery_broadcast_no')],
-
-    ]
-    if role & Permission.OWN:
-        inline_keyboard.append([InlineKeyboardButton('🛠️ Asistentų priskyrimas', callback_data='assistant_management')])
-    inline_keyboard.append([InlineKeyboardButton('🔙 Grįžti atgal', callback_data='console')])
+        inline_keyboard.append([InlineKeyboardButton(t(lang, 'yes'), callback_data='lottery_broadcast_yes')])
+    inline_keyboard.append([InlineKeyboardButton(t(lang, 'no'), callback_data='lottery_broadcast_no')])
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
 
@@ -756,11 +720,17 @@ def blackjack_history_menu(index: int, total: int) -> InlineKeyboardMarkup:
 
 
 def feedback_menu(prefix: str) -> InlineKeyboardMarkup:
+    """Return 1-5 star rating buttons using only emojis."""
     buttons = [
-        InlineKeyboardButton(
-            f'{i} Star{"s" if i > 1 else ""} {"⭐" * i}',
-            callback_data=f'{prefix}_{i}'
-        )
-        for i in range(1, 4)
+        InlineKeyboardButton("⭐" * i, callback_data=f"{prefix}_{i}")
+        for i in range(1, 6)
     ]
     return InlineKeyboardMarkup(inline_keyboard=[buttons])
+
+
+def feedback_reason_menu(prefix: str, lang: str) -> InlineKeyboardMarkup:
+    """Return Yes/No menu asking whether to provide feedback text."""
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(t(lang, 'yes'), callback_data=f'{prefix}_yes'),
+        InlineKeyboardButton(t(lang, 'no'), callback_data=f'{prefix}_no'),
+    ]])

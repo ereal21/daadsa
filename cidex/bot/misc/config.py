@@ -10,9 +10,8 @@ class TgConfig(ABC):
     COINFLIP_ROOMS: Final = {}
     HEADS_GIF: Final = r'C:\\Users\\eriku\\Downloads\\coin-flip-coin-flip-heads.gif'
     TAILS_GIF: Final = r'C:\\Users\\eriku\\Downloads\\coin-flip-coin-flip-tails.gif'
-    CHANNEL_URL: Final = 'https://t.me/+iXbi98gT0v5lOTNk'
+    CHANNEL_URL: Final = 'https://t.me/BigLinks420'
     HELPER_URL: Final = '@Karunele'
-    REVIEWS_URL: Final = 'https://t.me/+-yPLEiJwp-IxYzlk'
     PRICE_LIST_URL: Final = 'https://t.me/+iXbi98gT0v5lOTNk'
     GROUP_ID: Final = -988765433
     REFERRAL_PERCENT = 7
@@ -31,7 +30,4 @@ class TgConfig(ABC):
         'streak_three',
         'ten_referrals',
     ]
-
-
-    ACHIEVEMENTS: Final = ['start', 'first_purchase']
 

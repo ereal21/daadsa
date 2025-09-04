@@ -395,6 +395,21 @@ def get_user_referral(user_id: int) -> int | None:
     return result[0] if result else None
 
 
+def sum_referral_operations(user_id: int) -> int:
+    """Return total top-up amount from users referred by given user."""
+    session = Database().session
+    refs = session.query(User.telegram_id).filter(User.referral_id == user_id).all()
+    total = 0
+    for (ref_id,) in refs:
+        ops_sum = (
+            session.query(func.sum(Operations.operation_value))
+            .filter(Operations.user_id == ref_id)
+            .scalar()
+        )
+        total += ops_sum or 0
+    return total
+
+
 def get_promocode(code: str) -> dict | None:
     result = (Database().session.query(PromoCode)
               .filter(PromoCode.code == code, PromoCode.active.is_(True))
