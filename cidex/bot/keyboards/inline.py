@@ -142,20 +142,14 @@ def profile(user_items: int = 0, lang: str = 'en') -> InlineKeyboardMarkup:
         [InlineKeyboardButton(t(lang, 'achievements'), callback_data='achievements')],
         [InlineKeyboardButton(t(lang, 'quests'), callback_data='quests')],
         [InlineKeyboardButton(t(lang, 'gift'), callback_data='gift')],
-        [InlineKeyboardButton(t(lang, 'stock_notify'), callback_data='notify_stock')]
+        [InlineKeyboardButton(t(lang, 'stock_notify'), callback_data='notify_stock')],
     ]
-
-
-    inline_keyboard.append([InlineKeyboardButton(t(lang, 'gift'), callback_data='gift')])
-    inline_keyboard.append([InlineKeyboardButton(t(lang, 'games'), callback_data='games')])
-    inline_keyboard.append([InlineKeyboardButton(t(lang, 'achievements'), callback_data='achievements')])
-    inline_keyboard.append([InlineKeyboardButton(t(lang, 'stock_notify'), callback_data='notify_stock')])
-
-    inline_keyboard.append([InlineKeyboardButton(t(lang, 'games'), callback_data='games')])
     if user_items != 0:
-        inline_keyboard.append([InlineKeyboardButton('🎁 Purchased items', callback_data='bought_items')])
+        inline_keyboard.append([
+            InlineKeyboardButton(t(lang, 'purchased_items'), callback_data='bought_items')
+        ])
     inline_keyboard.append([InlineKeyboardButton(t(lang, 'help'), callback_data='help')])
-    inline_keyboard.append([InlineKeyboardButton('🔙 Back to menu', callback_data='back_to_menu')])
+    inline_keyboard.append([InlineKeyboardButton(t(lang, 'back_to_menu'), callback_data='back_to_menu')])
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
 
@@ -177,17 +171,8 @@ def achievements_menu(page: int, total: int, lang: str = 'en', unlocked: bool = 
         nav.append(InlineKeyboardButton('➡️', callback_data=f'{prefix}:{page+1}'))
     rows = [nav] if nav else []
     toggle_label = t(lang, 'show_locked') if unlocked else t(lang, 'show_unlocked')
-    toggle_cb = ('achievements:0' if unlocked else 'achievements_unlocked:0')
+    toggle_cb = 'achievements:0' if unlocked else 'achievements_unlocked:0'
     rows.append([InlineKeyboardButton(toggle_label, callback_data=toggle_cb)])
-
-
-def achievements_menu(page: int, total: int, lang: str = 'en') -> InlineKeyboardMarkup:
-    nav = []
-    if page > 0:
-        nav.append(InlineKeyboardButton('⬅️', callback_data=f'achievements:{page-1}'))
-    if (page + 1) * 5 < total:
-        nav.append(InlineKeyboardButton('➡️', callback_data=f'achievements:{page+1}'))
-    rows = [nav] if nav else []
     rows.append([InlineKeyboardButton(t(lang, 'back'), callback_data='profile')])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -401,41 +386,20 @@ def lottery_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
 
-def lottery_run_menu() -> InlineKeyboardMarkup:
+def lottery_run_menu(lang: str = 'en') -> InlineKeyboardMarkup:
     inline_keyboard = [
-        [InlineKeyboardButton('✅ Patvirtinti', callback_data='lottery_confirm')],
-        [InlineKeyboardButton('🔄 Perleisti', callback_data='lottery_rerun')],
-        [InlineKeyboardButton('❌ Atšaukti', callback_data='lottery_cancel')],
+        [InlineKeyboardButton(t(lang, 'confirm'), callback_data='lottery_confirm')],
+        [InlineKeyboardButton(t(lang, 'rerun'), callback_data='lottery_rerun')],
+        [InlineKeyboardButton(t(lang, 'cancel'), callback_data='lottery_cancel')],
     ]
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
 
-def lottery_broadcast_menu(role: int) -> InlineKeyboardMarkup:
+def lottery_broadcast_menu(role: int, lang: str = 'en') -> InlineKeyboardMarkup:
     inline_keyboard = []
     if role & Permission.OWN:
-        inline_keyboard.append([InlineKeyboardButton('✅ Taip', callback_data='lottery_broadcast_yes')])
-    inline_keyboard.append([InlineKeyboardButton('❌ Ne', callback_data='lottery_broadcast_no')])
-    return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
-
-
-def lottery_run_menu() -> InlineKeyboardMarkup:
-    inline_keyboard = [
-        [InlineKeyboardButton('✅ Patvirtinti', callback_data='lottery_confirm')],
-        [InlineKeyboardButton('🔄 Perleisti', callback_data='lottery_rerun')],
-        [InlineKeyboardButton('❌ Atšaukti', callback_data='lottery_cancel')],
-    ]
-    return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
-
-
-def lottery_broadcast_menu() -> InlineKeyboardMarkup:
-    inline_keyboard = [
-        [InlineKeyboardButton('✅ Taip', callback_data='lottery_broadcast_yes')],
-        [InlineKeyboardButton('❌ Ne', callback_data='lottery_broadcast_no')],
-
-    ]
-    if role & Permission.OWN:
-        inline_keyboard.append([InlineKeyboardButton('🛠️ Asistentų priskyrimas', callback_data='assistant_management')])
-    inline_keyboard.append([InlineKeyboardButton('🔙 Grįžti atgal', callback_data='console')])
+        inline_keyboard.append([InlineKeyboardButton(t(lang, 'yes'), callback_data='lottery_broadcast_yes')])
+    inline_keyboard.append([InlineKeyboardButton(t(lang, 'no'), callback_data='lottery_broadcast_no')])
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
 
