@@ -1792,27 +1792,42 @@ async def checking_payment(call: CallbackQuery):
                             if photo_desc:
                                 caption += f'\n\n{photo_desc}'
                             if gift_to:
-
-        if gift_to:
                                 recipient_lang = get_user_language(gift_to) or 'en'
-                                recipient_caption = t(recipient_lang, 'gift_received', item=value_data['item_name'], user=username)
+                                recipient_caption = t(
+                                    recipient_lang,
+                                    'gift_received',
+                                    item=value_data['item_name'],
+                                    user=username
+                                )
                                 if value_data['value'].endswith('.mp4'):
-                                    await bot.send_video(gift_to, media, caption=recipient_caption, parse_mode='HTML')
+                                    await bot.send_video(
+                                        gift_to,
+                                        media,
+                                        caption=recipient_caption,
+                                        parse_mode='HTML'
+                                    )
                                 else:
-                                    await bot.send_photo(gift_to, media, caption=recipient_caption, parse_mode='HTML')
+                                    await bot.send_photo(
+                                        gift_to,
+                                        media,
+                                        caption=recipient_caption,
+                                        parse_mode='HTML'
+                                    )
                             else:
                                 if value_data['value'].endswith('.mp4'):
-                                    await bot.send_video(chat_id=call.message.chat.id, video=media, caption=caption, parse_mode='HTML')
+                                    await bot.send_video(
+                                        chat_id=call.message.chat.id,
+                                        video=media,
+                                        caption=caption,
+                                        parse_mode='HTML'
+                                    )
                                 else:
-                                    await bot.send_photo(chat_id=call.message.chat.id, photo=media, caption=caption, parse_mode='HTML')
-
-
-
-
-                            if value_data['value'].endswith('.mp4'):
-                                await bot.send_video(chat_id=call.message.chat.id, video=media, caption=caption, parse_mode='HTML')
-                            else:
-                                await bot.send_photo(chat_id=call.message.chat.id, photo=media, caption=caption, parse_mode='HTML')
+                                    await bot.send_photo(
+                                        chat_id=call.message.chat.id,
+                                        photo=media,
+                                        caption=caption,
+                                        parse_mode='HTML'
+                                    )
 
 
                         sold_folder = os.path.join(os.path.dirname(value_data['value']), 'Sold')
@@ -1825,16 +1840,22 @@ async def checking_payment(call: CallbackQuery):
                         if os.path.isfile(desc_file):
                             cleanup_item_file(desc_file)
                     else:
-
                         if gift_to:
                             recipient_lang = get_user_language(gift_to) or 'en'
-                            await bot.send_message(gift_to, t(recipient_lang, 'gift_received', item=value_data['item_name'], user=username))
+                            await bot.send_message(
+                                gift_to,
+                                t(
+                                    recipient_lang,
+                                    'gift_received',
+                                    item=value_data['item_name'],
+                                    user=username
+                                )
+                            )
                         else:
-                            await bot.send_message(call.message.chat.id, value_data['value'])
-
-
-
-                        await bot.send_message(call.message.chat.id, value_data['value'])
+                            await bot.send_message(
+                                call.message.chat.id,
+                                value_data['value']
+                            )
 
 
 
