@@ -52,8 +52,8 @@ from bot.utils.files import cleanup_item_file
 def build_menu_text(user_obj, balance: float, purchases: int, streak: int, lang: str) -> str:
     """Return main menu text with loyalty status and streak."""
     mention = f"<a href='tg://user?id={user_obj.id}'>{html.escape(user_obj.full_name)}</a>"
-    level_name, _, progress_bar, battery = get_level_info(purchases, lang)
-    status = f"👤 Status: {level_name} [{progress_bar}] {battery}"
+    level_name, _, battery = get_level_info(purchases, lang)
+    status = f"👤 Status: {level_name} {battery}"
     streak_line = t(lang, 'streak', days=streak)
     return (
         f"{t(lang, 'hello', user=mention)}\n"
@@ -889,7 +889,7 @@ async def item_info_callback_handler(call: CallbackQuery):
     category = item_info_list['category_name']
     lang = get_user_language(user_id) or 'en'
     purchases = select_user_items(user_id)
-    _, discount, _, _ = get_level_info(purchases, lang)
+    _, discount, _ = get_level_info(purchases, lang)
     price = round(item_info_list["price"] * (100 - discount) / 100, 2)
     markup = item_info(item_name, category, lang)
     await bot.edit_message_text(
@@ -955,9 +955,9 @@ async def confirm_buy_callback_handler(call: CallbackQuery):
         return
     lang = get_user_language(user_id) or 'en'
     purchases = select_user_items(user_id)
-    _, discount, _, _ = get_level_info(purchases, lang)
+    _, discount, _ = get_level_info(purchases, lang)
 
-    _, discount, _, _ = get_level_info(purchases)
+    _, discount, _ = get_level_info(purchases)
     user = check_user(user_id)
     price = round(info['price'] * (100 - discount) / 100, 2)
     if user and user.streak_discount:
@@ -1042,8 +1042,8 @@ async def buy_item_callback_handler(call: CallbackQuery):
             else:
                 add_bought_item(value_data['item_name'], value_data['value'], item_price, user_id, formatted_time)
             purchases = purchases_before + 1
-            level_before, _, _, _ = get_level_info(purchases_before, lang)
-            level_after, discount, _, _ = get_level_info(purchases, lang)
+            level_before, _, _ = get_level_info(purchases_before, lang)
+            level_after, discount, _ = get_level_info(purchases, lang)
             if level_after != level_before:
                 await bot.send_message(
                     user_id,
@@ -1501,38 +1501,23 @@ async def achievements_callback_handler(call: CallbackQuery):
     per_page = 5
     start = page * per_page
     show_unlocked = view == 'achievements_unlocked'
-    all_codes = [code for code in TgConfig.ACHIEVEMENTS if has_user_achievement(user_id, code) == show_unlocked]
+    codes = [
+        code for code in TgConfig.ACHIEVEMENTS
+        if has_user_achievement(user_id, code) == show_unlocked
+    ]
     lines = []
-    for idx, code in enumerate(all_codes[start:start + per_page], start=start + 1):
+    for idx, code in enumerate(codes[start:start + per_page], start=start + 1):
         count = get_achievement_users(code)
         percent = round((count / total_users) * 100, 1) if total_users else 0
         status = '✅' if show_unlocked else '❌'
         lines.append(f"{idx}. {status} {t(lang, f'achievement_{code}')} — {percent}%")
     text = f"{t(lang, 'achievements')}\n\n" + "\n".join(lines)
-    markup = achievements_menu(page, len(all_codes), lang, show_unlocked)
-    page = int(parts[1]) if len(parts) > 1 else 0
-    per_page = 5
-    start = page * per_page
-    achievements = TgConfig.ACHIEVEMENTS
-    lines = []
-    for idx, code in enumerate(achievements[start:start + per_page], start=start + 1):
-    lines = []
-    for code in TgConfig.ACHIEVEMENTS:
-        count = get_achievement_users(code)
-        percent = round((count / total_users) * 100, 1) if total_users else 0
-        have = has_user_achievement(user_id, code)
-        status = '✅' if have else '❌'
-        lines.append(f"{idx}. {status} {t(lang, f'achievement_{code}')} — {percent}%")
-    text = f"{t(lang, 'achievements')}\n\n" + "\n".join(lines)
-    markup = achievements_menu(page, len(achievements), lang)
-        lines.append(f"{status} {t(lang, f'achievement_{code}')} — {percent}%")
-    text = f"{t(lang, 'achievements')}\n\n" + "\n".join(lines)
+    markup = achievements_menu(page, len(codes), lang, show_unlocked)
     await bot.edit_message_text(
         chat_id=call.message.chat.id,
         message_id=call.message.message_id,
         text=text,
-        reply_markup=markup
-        reply_markup=back('profile')
+        reply_markup=markup,
     )
 
 
@@ -1807,27 +1792,42 @@ async def checking_payment(call: CallbackQuery):
                             if photo_desc:
                                 caption += f'\n\n{photo_desc}'
                             if gift_to:
-
-        if gift_to:
                                 recipient_lang = get_user_language(gift_to) or 'en'
-                                recipient_caption = t(recipient_lang, 'gift_received', item=value_data['item_name'], user=username)
+                                recipient_caption = t(
+                                    recipient_lang,
+                                    'gift_received',
+                                    item=value_data['item_name'],
+                                    user=username
+                                )
                                 if value_data['value'].endswith('.mp4'):
-                                    await bot.send_video(gift_to, media, caption=recipient_caption, parse_mode='HTML')
+                                    await bot.send_video(
+                                        gift_to,
+                                        media,
+                                        caption=recipient_caption,
+                                        parse_mode='HTML'
+                                    )
                                 else:
-                                    await bot.send_photo(gift_to, media, caption=recipient_caption, parse_mode='HTML')
+                                    await bot.send_photo(
+                                        gift_to,
+                                        media,
+                                        caption=recipient_caption,
+                                        parse_mode='HTML'
+                                    )
                             else:
                                 if value_data['value'].endswith('.mp4'):
-                                    await bot.send_video(chat_id=call.message.chat.id, video=media, caption=caption, parse_mode='HTML')
+                                    await bot.send_video(
+                                        chat_id=call.message.chat.id,
+                                        video=media,
+                                        caption=caption,
+                                        parse_mode='HTML'
+                                    )
                                 else:
-                                    await bot.send_photo(chat_id=call.message.chat.id, photo=media, caption=caption, parse_mode='HTML')
-
-
-
-
-                            if value_data['value'].endswith('.mp4'):
-                                await bot.send_video(chat_id=call.message.chat.id, video=media, caption=caption, parse_mode='HTML')
-                            else:
-                                await bot.send_photo(chat_id=call.message.chat.id, photo=media, caption=caption, parse_mode='HTML')
+                                    await bot.send_photo(
+                                        chat_id=call.message.chat.id,
+                                        photo=media,
+                                        caption=caption,
+                                        parse_mode='HTML'
+                                    )
 
 
                         sold_folder = os.path.join(os.path.dirname(value_data['value']), 'Sold')
@@ -1840,16 +1840,22 @@ async def checking_payment(call: CallbackQuery):
                         if os.path.isfile(desc_file):
                             cleanup_item_file(desc_file)
                     else:
-
                         if gift_to:
                             recipient_lang = get_user_language(gift_to) or 'en'
-                            await bot.send_message(gift_to, t(recipient_lang, 'gift_received', item=value_data['item_name'], user=username))
+                            await bot.send_message(
+                                gift_to,
+                                t(
+                                    recipient_lang,
+                                    'gift_received',
+                                    item=value_data['item_name'],
+                                    user=username
+                                )
+                            )
                         else:
-                            await bot.send_message(call.message.chat.id, value_data['value'])
-
-
-
-                        await bot.send_message(call.message.chat.id, value_data['value'])
+                            await bot.send_message(
+                                call.message.chat.id,
+                                value_data['value']
+                            )
 
 
 
@@ -2068,10 +2074,6 @@ def register_user_handlers(dp: Dispatcher):
                                        lambda c: c.data == 'quests')
     dp.register_callback_query_handler(achievements_callback_handler,
                                        lambda c: c.data.startswith('achievements'))
-
-
-    dp.register_callback_query_handler(achievements_callback_handler,
-                                       lambda c: c.data == 'achievements')
     dp.register_callback_query_handler(notify_stock_callback_handler,
                                        lambda c: c.data == 'notify_stock')
     dp.register_callback_query_handler(notify_category_callback_handler,
